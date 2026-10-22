@@ -1,0 +1,78 @@
+
+---
+- name: Deploy RCW-Server01 in vCenter
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    vcenter_hostname: "RCWvCenter"
+    vcenter_username: "{{ lookup('env', 'VMWARE_USER') }}"
+    vcenter_password: "{{ lookup('env', 'VMWARE_PASSWORD') }}"
+
+    datacenter_name: "YOUR-DATACENTER"
+    cluster_name: "YOUR-CLUSTER"
+    datastore_name: "YOUR-DATASTORE"
+    network_name: "YOUR-VM-NETWORK"
+    template_name: "YOUR-OS-TEMPLATE"
+
+    vm_name: "RCW-Server01"
+    vm_folder: "/YOUR-DATACENTER/vm"
+    vm_cpus: 2
+    vm_memory_mb: 4096
+    vm_disk_gb: 60
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - vcenter_username | length > 0
+          - vcenter_password | length > 0
+          - "'YOUR-' not in datacenter_name"
+          - "'YOUR-' not in cluster_name"
+          - "'YOUR-' not in datastore_name"
+          - "'YOUR-' not in network_name"
+          - "'YOUR-' not in template_name"
+        fail_msg: "Set vCenter credentials and all vSphere resource names."
+
+    - name: Clone RCW-Server01 from template
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: true
+
+        datacenter: "{{ datacenter_name }}"
+        cluster: "{{ cluster_name }}"
+        datastore: "{{ datastore_name }}"
+        folder: "{{ vm_folder }}"
+
+        name: "{{ vm_name }}"
+        template: "{{ template_name }}"
+        state: poweredon
+
+        hardware:
+          num_cpus: "{{ vm_cpus }}"
+          memory_mb: "{{ vm_memory_mb }}"
+
+        disk:
+          - size_gb: "{{ vm_disk_gb }}"
+            type: thin
+            datastore: "{{ datastore_name }}"
+
+        networks:
+          - name: "{{ network_name }}"
+            device_type: vmxnet3
+            start_connected: true
+
+      delegate_to: localhost
+      register: vm_deployment
+      no_log: true
+
+    - name: Report deployment result
+      ansible.builtin.debug:
+        msg:
+          - "VM deployment task completed for {{ vm_name }}."
+          - "Review vCenter to confirm the VM is powered on."
+      when: not (vm_deployment.failed | default(false))
+

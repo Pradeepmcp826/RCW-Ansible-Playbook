@@ -1,0 +1,24 @@
+---
+- name: Deny ssh for user Rishi
+  hosts: LServerA
+  become: true
+  vars:
+   user_name: Rishi
+
+  tasks:
+   - name: deny ssh
+     ansible.builtin.lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^\s*DenyUsers\s+{{ user_name }}(\s|$)'
+      line: "DenyUsers {{ user_name }}"
+      state: present
+      validate: '/usr/sbin/sshd -t -f %s'
+     notify: Restart sshd
+     
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+       name: sshd
+       state: restarted
+ 
